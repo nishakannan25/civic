@@ -1,0 +1,7 @@
+{
+  "dataset_name": "dataset_4_flooding_source",
+  "source": "Disaster Response Flooding Feed",
+  "license": "CC-BY-SA-4.0",
+  "target_class": "flooding",
+  "intended_count": 78
+}

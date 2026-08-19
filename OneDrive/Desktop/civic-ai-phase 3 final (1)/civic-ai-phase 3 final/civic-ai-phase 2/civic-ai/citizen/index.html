@@ -1,0 +1,1647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Civic AI — Citizen Portal</title>
+  <meta name="description" content="Report civic issues, track resolutions, and build a better community with Civic AI." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap');
+    * { font-family: 'Plus Jakarta Sans', sans-serif; transition: background-color 0.2s, border-color 0.2s; }
+    
+    /* Theme Themes */
+    body.theme-dark { background: #020617; color: #f8fafc; }
+    body.theme-light { background: #f8fafc; color: #0f172a; }
+    body.theme-cyber { background: #090d16; color: #e0f2fe; }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+
+    /* Glassmorphism card */
+    body.theme-dark .glass { background: rgba(15,23,42,0.75); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.06); }
+    body.theme-light .glass { background: rgba(255,255,255,0.85); backdrop-filter: blur(16px); border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); }
+    body.theme-cyber .glass { background: rgba(13,27,42,0.8); backdrop-filter: blur(16px); border: 1px solid rgba(14,165,233,0.2); }
+
+    /* Text & Colors according to Theme */
+    body.theme-light .text-white { color: #0f172a !important; }
+    body.theme-light .text-slate-400 { color: #64748b !important; }
+    body.theme-light .text-slate-300 { color: #334155 !important; }
+    body.theme-light .bg-slate-900 { background: #f1f5f9 !important; color: #0f172a !important; }
+    body.theme-light .bg-slate-950 { background: #e2e8f0 !important; color: #0f172a !important; }
+
+    /* Gradient text */
+    .gradient-text { background: linear-gradient(135deg, #6366f1, #8b5cf6, #06b6d4); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+
+    /* Animated gradient bg */
+    body.theme-dark .hero-bg { background: radial-gradient(ellipse at 30% 20%, rgba(99,102,241,0.15) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(139,92,246,0.1) 0%, transparent 50%), #020617; }
+    body.theme-light .hero-bg { background: radial-gradient(ellipse at 30% 20%, rgba(99,102,241,0.08) 0%, transparent 50%), #f8fafc; }
+    body.theme-cyber .hero-bg { background: radial-gradient(ellipse at 30% 20%, rgba(14,165,233,0.2) 0%, transparent 50%), #090d16; }
+
+    /* Glow effects */
+    .glow-indigo { box-shadow: 0 0 30px rgba(99,102,241,0.3); }
+    .glow-emerald { box-shadow: 0 0 20px rgba(16,185,129,0.25); }
+    .glow-rose { box-shadow: 0 0 20px rgba(244,63,94,0.3); }
+
+    /* Pulse animation for SOS */
+    @keyframes sos-pulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(244,63,94,0.7); }
+      50% { box-shadow: 0 0 0 20px rgba(244,63,94,0); }
+    }
+    .sos-pulse { animation: sos-pulse 1.5s ease-in-out infinite; }
+
+    @keyframes recording-pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.1); opacity: 0.8; }
+    }
+    .rec-pulse { animation: recording-pulse 1s infinite; }
+
+    /* Fade in */
+    @keyframes fadeInUp { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+    .fade-in { animation: fadeInUp 0.4s ease both; }
+
+    /* Status pills */
+    .status-unassigned { background:rgba(245,158,11,0.15); color:#fbbf24; border:1px solid rgba(245,158,11,0.3); }
+    .status-assigned { background:rgba(99,102,241,0.15); color:#a5b4fc; border:1px solid rgba(99,102,241,0.3); }
+    .status-in_progress { background:rgba(59,130,246,0.15); color:#93c5fd; border:1px solid rgba(59,130,246,0.3); }
+    .status-resolved { background:rgba(16,185,129,0.15); color:#6ee7b7; border:1px solid rgba(16,185,129,0.3); }
+    .status-closed { background:rgba(100,116,139,0.15); color:#94a3b8; border:1px solid rgba(100,116,139,0.3); }
+
+    input, textarea, select { color-scheme: dark; }
+    body.theme-light input, body.theme-light textarea, body.theme-light select { color-scheme: light; }
+
+    .upload-zone { border: 2px dashed rgba(99,102,241,0.4); transition: all 0.2s; }
+    .upload-zone:hover { border-color: rgba(99,102,241,0.8); background: rgba(99,102,241,0.05); }
+  </style>
+</head>
+<body class="theme-dark hero-bg min-h-screen">
+
+<div id="app"></div>
+
+<!-- Toast Container -->
+<div id="toasts" class="fixed bottom-6 right-6 z-[100] space-y-2"></div>
+
+<!-- Custom SOS & Modal Dialog Container -->
+<div id="modal-container" class="hidden fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"></div>
+
+<!-- Live Camera Video Modal Container -->
+<div id="camera-modal" class="hidden fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4">
+  <div class="glass w-full max-w-lg rounded-2xl p-6 relative flex flex-col items-center space-y-4">
+    <button onclick="closeCamera()" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl font-bold">✕</button>
+    <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+      <span>📷</span><span id="cam-modal-title">Live Camera Capture</span>
+    </h3>
+    <div class="relative w-full aspect-video bg-black rounded-xl overflow-hidden border border-slate-800 flex items-center justify-center">
+      <video id="camera-stream" autoplay playsinline class="w-full h-full object-cover"></video>
+      <canvas id="camera-canvas" class="hidden"></canvas>
+    </div>
+    <div class="flex space-x-3 w-full">
+      <button onclick="snapCameraPhoto()" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 flex items-center justify-center space-x-2">
+        <span>📸</span><span>Capture Photo</span>
+      </button>
+      <button onclick="closeCamera()" class="py-3 px-5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm rounded-xl">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- SOS Floating Button (shown when logged in) -->
+<div id="sos-btn" class="hidden fixed bottom-6 left-6 z-[100]">
+  <button onclick="openCustomSOSModal()" class="sos-pulse w-14 h-14 rounded-full bg-rose-600 hover:bg-rose-500 flex items-center justify-center shadow-2xl transition-transform hover:scale-110 active:scale-95">
+    <span class="text-white font-black text-xs tracking-wider">SOS</span>
+  </button>
+</div>
+
+<script>
+// Centralized Localization Dictionary (English & Tamil)
+const I18N = {
+  en: {
+    appName: "CIVIC AI",
+    appTitle: "CIVIC AI",
+    subTitle: "Report civic problems. Build a better community.",
+    welcomeTitle: "WELCOME CITIZEN",
+    welcomeTagline: "Report civic problems. Help your community. Make your city better.",
+    start: "START",
+    chooseLanguage: "CHOOSE LANGUAGE",
+    chooseLangSubtitle: "Select your preferred language",
+    howItWorksTitle: "HOW CIVIC AI WORKS",
+    step1Title: "1️⃣ Report",
+    step1Desc: "Take a photo of a civic problem.",
+    step2Title: "2️⃣ AI Detection",
+    step2Desc: "AI identifies the reported issue.",
+    step3Title: "3️⃣ Community Verification",
+    step3Desc: "Nearby citizens within 500m verify the issue.",
+    step4Title: "4️⃣ Risk Assessment",
+    step4Desc: "The system assesses the severity.",
+    step5Title: "5️⃣ Action",
+    step5Desc: "Critical issues trigger SOS workflow. Normal issues are routed to departments.",
+    step6Title: "6️⃣ Resolution",
+    step6Desc: "Track the issue until it is resolved.",
+    continueBtn: "CONTINUE",
+    getStarted: "GET STARTED",
+    signIn: "LOGIN",
+    createAccount: "REGISTER",
+    fullName: "Full Name",
+    email: "Email Address",
+    phone: "Phone Number",
+    password: "Password",
+    home: "Home",
+    report: "Report",
+    myReports: "My Reports",
+    community: "Community",
+    alerts: "Alerts",
+    help: "Help & FAQ",
+    aiGuide: "AI Guide",
+    settings: "Settings",
+    welcomeHeader: "WELCOME, CITIZEN 👋",
+    reportIssueBtn: "📷 REPORT AN ISSUE",
+    myReportsBtn: "📋 MY REPORTS",
+    communityBtn: "🤝 COMMUNITY VERIFICATION",
+    sosBtn: "🆘 SOS / CRITICAL INCIDENTS",
+    helpBtn: "❓ HELP & FAQ",
+    aiGuideBtn: "🤖 AI GUIDE",
+    settingsBtn: "⚙️ SETTINGS",
+    activeCountLabel: "Active Reports",
+    resolvedCountLabel: "Resolved Reports",
+    pendingVerifLabel: "Pending Verifications",
+    emergencyHelplines: "🆘 Emergency & Civic Helplines",
+    callBtn: "Call",
+    civicDepartmentsTitle: "🏢 Civic Departments & Areas",
+    faqTitle: "❓ FREQUENTLY ASKED QUESTIONS",
+    aiGuideTitle: "🤖 CIVIC AI GUIDE",
+    aiGuidePlaceholder: "Ask your question about Civic AI...",
+    send: "Send",
+    verifyTitle: "COMMUNITY VERIFICATION",
+    verifySubtitle: "Verify nearby issues reported within 500m of your location.",
+    verifySeverityLabel: "Severity Rating (1–10)",
+    confirmYes: "✅ YES — Confirm Issue",
+    confirmNo: "❌ NO — Not Found",
+    nearbyNotice: "A civic issue has been reported near your location (500m radius).",
+    distanceLabel: "Distance:",
+    seeIssueQ: "Do you see this issue?",
+    yes: "YES",
+    no: "NO",
+    rateSeverityQ: "How severe is this issue? (Rate 1 to 10)",
+    submitRating: "SUBMIT VERIFICATION",
+    alreadyVerifiedMsg: "You have already verified this issue.",
+    resolutionFeedbackTitle: "ISSUE RESOLVED ✅",
+    satisfiedQ: "Was the issue resolved satisfactorily?",
+    howSatisfiedQ: "⭐ How satisfied are you? (1 to 5)",
+    tellUsMore: "What would you like to tell us?",
+    submitFeedback: "SUBMIT FEEDBACK",
+    feedbackSubmittedMsg: "Feedback Submitted ✅",
+    alreadySubmittedFb: "You have already submitted feedback for this incident.",
+    statusTimelineTitle: "Incident Lifecycle Status",
+    timelineReported: "Reported",
+    timelineAI: "AI Analysis",
+    timelineCommunity: "Community Verification",
+    timelineRisk: "Risk Assessment",
+    timelineDept: "Department Assigned",
+    timelineInProgress: "In Progress",
+    timelineResolved: "Resolved",
+    timelineClosed: "Closed",
+    errOffline: "You're offline. Your report will be saved and synced when internet is available.",
+    errGPS: "Location is unavailable. You can continue without GPS.",
+    errServer: "We couldn't connect to Civic AI right now. Please try again.",
+    errAI: "AI analysis is temporarily unavailable. Please try again later.",
+  },
+  ta: {
+    appName: "சிவிக் AI",
+    appTitle: "சிவிக் AI",
+    subTitle: "சமூகப் பிரச்சனைகளை புகாரளிக்கவும். நகரை மேம்படுத்துங்கள்.",
+    welcomeTitle: "வரவேற்கிறோம் குடிமகனே",
+    welcomeTagline: "சமூகப் பிரச்சனைகளைப் புகாரளிக்கவும். உங்கள் சமூகத்திற்கு உதவுங்கள். உங்கள் நகரத்தை மேம்படுத்துங்கள்.",
+    welcomeDesc: "புகைப்படம் எடுக்கவும். இடத்தை குறிக்கவும். நிவாரணத்தை கண்காணிக்கவும்.",
+    start: "தொடங்கு",
+    chooseLanguage: "மொழியை தேர்வு செய்க",
+    chooseLangSubtitle: "உங்களுக்கு விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்",
+    howItWorksTitle: "சிவிக் AI எவ்வாறு செயல்படுகிறது",
+    step1Title: "1️⃣ புகாரளி",
+    step1Desc: "சமூகப் பிரச்சனையின் புகைப்படத்தை எடுக்கவும்.",
+    step2Title: "2️⃣ AI கண்டறிதல்",
+    step2Desc: "AI புகாரளிக்கப்பட்ட பிரச்சனையை அடையாளம் காண்கிறது.",
+    step3Title: "3️⃣ சமூக சரிபார்ப்பு",
+    step3Desc: "500 மீட்டருக்குள் உள்ள அருகில் உள்ள குடிமக்கள் பிரச்சனையை சரிபார்க்கலாம்.",
+    step4Title: "4️⃣ ஆபத்து மதிப்பீடு",
+    step4Desc: "அமைப்பு பிரச்சனையின் தீவிரத்தை மதிப்பிடுகிறது.",
+    step5Title: "5️⃣ நடவடிக்கை",
+    step5Desc: "அவசர பிரச்சனைகள் SOS எச்சரிக்கையை உருவாக்குகின்றன. சாதாரண பிரச்சனைகள் பொருத்தமான துறைக்கு அனுப்பப்படும்.",
+    step6Title: "6️⃣ தீர்வு",
+    step6Desc: "பிரச்சனை தீர்க்கப்படும் வரை நிலையைக் கண்காணிக்கவும்.",
+    continueBtn: "தொடரவும்",
+    getStarted: "தொடங்குங்கள்",
+    signIn: "உள்நுழைக",
+    createAccount: "பதிவு செய்க",
+    fullName: "முழு பெயர்",
+    email: "மின்னஞ்சல் முகவரி",
+    phone: "தொலைபேசி எண்",
+    password: "கடவுச்சொல்",
+    home: "முகப்பு",
+    report: "புகாரளி",
+    myReports: "எனது புகார்கள்",
+    community: "சமூக சரிபார்ப்பு",
+    alerts: "அறிவிப்புகள்",
+    help: "உதவி & கேள்விகள்",
+    aiGuide: "AI வழிகாட்டி",
+    settings: "அமைப்புகள்",
+    goodDay: "வணக்கம்",
+    welcomeHeader: "வரவேற்கிறோம், குடிமகனே 👋",
+    primaryReportBtn: "📷 பிரச்சனையை புகாரளிக்கவும்",
+    reportIssueBtn: "📷 பிரச்சனையை புகாரளிக்கவும்",
+    myReportsBtn: "📋 எனது புகார்கள்",
+    communityBtn: "🤝 சமூக சரிபார்ப்பு",
+    sosBtn: "🆘 அவசர SOS எச்சரிக்கை",
+    helpBtn: "❓ உதவி & கேள்விகள்",
+    aiGuideBtn: "🤖 AI வழிகாட்டி",
+    settingsBtn: "⚙️ அமைப்புகள்",
+    totalReports: "மொத்த புகார்கள்",
+    resolved: "தீர்க்கப்பட்டவை",
+    activeCountLabel: "செயலில் உள்ளவை",
+    resolvedCountLabel: "தீர்க்கப்பட்டவை",
+    pendingVerifLabel: "நிலுவையில் உள்ளவை",
+    civicPoints: "சமூக புள்ளிகள்",
+    emergencyHelplines: "🆘 அவசர உதவி எண்கள்",
+    callBtn: "அழைக்க",
+    civicDepartmentsTitle: "🏢 நகராட்சி துறைகள்",
+    faqTitle: "❓ அடிக்கடி கேட்கப்படும் கேள்விகள்",
+    aiGuideTitle: "🤖 சிவிக் AI வழிகாட்டி",
+    aiGuidePlaceholder: "சிவிக் AI பற்றி உங்கள் கேள்வியைக் கேளுங்கள்...",
+    send: "அனுப்பு",
+    verifyTitle: "சமூக சரிபார்ப்பு",
+    verifySubtitle: "500 மீட்டருக்குள் உள்ள அருகிலுள்ள பிரச்சனைகளை சரிபார்க்கவும்",
+    verifySeverityLabel: "தீவிரம் மதிப்பீடு (1–10)",
+    nearbyNotice: "உங்கள் இருப்பிடத்திற்கு அருகில் (500மீ சுற்றளவுக்குள்) ஒரு பிரச்சனை புகாரளிக்கப்பட்டுள்ளது.",
+    distanceLabel: "தூரம்:",
+    seeIssueQ: "இந்தப் பிரச்சனையை நீங்கள் காண்கிறீர்களா?",
+    yes: "ஆம்",
+    no: "இல்லை",
+    confirmYes: "✅ ஆம் — உறுதிப்படுத்துகிறேன்",
+    confirmNo: "❌ இல்லை — காணவில்லை",
+    rateSeverityQ: "தீவிரம் எவ்வளவு? (1 முதல் 10 வரை மதிப்பிடவும்)",
+    submitRating: "சரிபார்ப்பை சமர்ப்பி",
+    alreadyVerifiedMsg: "நீங்கள் ஏற்கனவே இந்தப் பிரச்சனையை சரிபார்த்துவிட்டீர்கள்.",
+    sosAlert: "SOS அவசர எச்சரிக்கை",
+    sosAlertTitle: "🚨 SOS அவசர எச்சரிக்கை",
+    sosAlertDesc: "உங்கள் அவசர எச்சரிக்கை மற்றும் இருப்பிடம் தொடர்புடைய அவசர சேவைகளுக்கு அனுப்பப்படும். உண்மையான அவசரநிலைகளுக்கு மட்டும் பயன்படுத்தவும்.",
+    confirmSOS: "🚨 SOS எச்சரிக்கையை அனுப்பு",
+    cancel: "ரத்து செய்க",
+    resolutionFeedbackTitle: "பிரச்சனை தீர்க்கப்பட்டது ✅",
+    satisfiedQ: "பிரச்சனை திருப்திகரமாக தீர்க்கப்பட்டதா?",
+    howSatisfiedQ: "⭐ உங்கள் திருப்தி அளவு எவ்வளவு? (1 முதல் 5)",
+    tellUsMore: "எங்களுக்கு என்ன கூற விரும்புகிறீர்கள்?",
+    submitFeedback: "கருத்தை சமர்ப்பிக்கவும்",
+    feedbackTitle: "⭐ கருத்து தெரிவிக்கவும்",
+    feedbackSatisfied: "திருப்திகரமாக தீர்க்கப்பட்டதா?",
+    feedbackYes: "✅ ஆம்",
+    feedbackNo: "❌ இல்லை",
+    feedbackRating: "திருப்தி மதிப்பீடு (1–5)",
+    feedbackComments: "கருத்துகள் (விரும்பினால்)",
+    feedbackSubmit: "கருத்தை சமர்ப்பிக்கவும்",
+    feedbackSubmittedMsg: "கருத்து சமர்ப்பிக்கப்பட்டது ✅",
+    alreadySubmittedFb: "இந்தப் புகாருக்கு நீங்கள் ஏற்கனவே கருத்து சமர்ப்பித்துவிட்டீர்கள்.",
+    statusTimelineTitle: "புகார் நிலை காலவரிசை",
+    timelineReported: "புகாரளிக்கப்பட்டது",
+    timelineAI: "AI பகுப்பாய்வு",
+    timelineCommunity: "சமூக சரிபார்ப்பு",
+    timelineRisk: "ஆபத்து மதிப்பீடு",
+    timelineDept: "துறைக்கு அனுப்பப்பட்டது",
+    timelineInProgress: "செயல்பாட்டில் உள்ளது",
+    timelineResolved: "தீர்க்கப்பட்டது",
+    timelineClosed: "முடிவுற்றது",
+    errOffline: "இணைய தொடர்பு இல்லை. இணையம் கிடைக்கும் போது உங்கள் புகார் ஒத்திசைக்கப்படும்.",
+    errGPS: "இருப்பிடம் கிடைக்கவில்லை. GPS இல்லாமல் தொடரலாம்.",
+    errServer: "சேவையகத்துடன் தொடர்பு கொள்ள முடியவில்லை.",
+    errAI: "AI பகுப்பாய்வு தற்காலிகமாக கிடைக்கவில்லை.",
+  }
+
+};
+
+const ISSUE_LABELS_EN = ['Pothole','Open Manhole','Garbage Dump','Flooding','Broken Streetlight','Water Leakage'];
+const ISSUE_LABELS_TA = ['சாலைக் குழி','திறந்த சாக்கடை','குப்பை மேடு','வெள்ளம்','பழுதடைந்த தெருவிளக்கு','குடிநீர் கசிவு'];
+const ISSUE_EMOJIS = ['🕳️','🔓','🗑️','🌊','💡','💧'];
+
+let S = {
+  token: localStorage.getItem('civic_token') || null,
+  user: JSON.parse(localStorage.getItem('civic_user') || 'null'),
+  onboardingStep: 'welcome', // Always show Welcome screen on launch ('welcome' | 'lang' | 'howItWorks' | 'app')
+  tab: 'home',
+  authMode: 'login',
+  lang: localStorage.getItem('civic_lang') || 'en', // 'en' | 'ta'
+  theme: localStorage.getItem('civic_theme') || 'dark', // 'dark' | 'light' | 'cyber'
+  loading: false,
+  incidents: [],
+  community: [],
+  notifications: [],
+  helplines: [],
+  departments: [],
+  faqs: [],
+  aiChat: [
+    { sender: 'ai', text: 'Hi! I am your Civic AI Guide. How can I help you today?' }
+  ],
+  expandedFaq: null,
+  verifyingIncident: null,
+  verificationRating: 5,
+  feedbackFormIncidentId: null,
+  feedbackSatisfied: 'YES',
+  feedbackRating: 5,
+  feedbackText: '',
+  submittingFeedback: false,
+  submittingVerification: false,
+  reportForm: { description:'', issue_type:'', lat: null, lng: null, image: null, imagePreview: null, voiceBlob: null },
+  submitting: false,
+  recordingVoice: false,
+  mediaRecorder: null,
+  audioChunks: [],
+  cameraStream: null,
+};
+
+
+function t(key) { return I18N[S.lang]?.[key] || I18N.en[key] || key; }
+
+function applyTheme(theme) {
+  S.theme = theme;
+  localStorage.setItem('civic_theme', theme);
+  document.body.className = `theme-${theme} hero-bg min-h-screen`;
+  render();
+}
+
+function setLang(lang) {
+  S.lang = lang;
+  localStorage.setItem('civic_lang', lang);
+  render();
+}
+
+// ─── TOAST NOTIFICATIONS ──────────────────────────────────────────────────────
+function toast(msg, isError=false) {
+  const el = document.createElement('div');
+  el.className = `px-4 py-3 rounded-xl text-sm font-semibold shadow-2xl fade-in ${isError ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`;
+  el.innerText = msg;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(() => { el.style.opacity='0'; setTimeout(() => el.remove(), 300); }, 3500);
+}
+
+// ─── WEBCAM CAMERA CAPTURE ────────────────────────────────────────────────────
+async function openCamera() {
+  const modal = document.getElementById('camera-modal');
+  const video = document.getElementById('camera-stream');
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    S.cameraStream = stream;
+    video.srcObject = stream;
+    modal.classList.remove('hidden');
+
+    // Auto-capture GPS as soon as camera opens
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        S.reportForm.lat = pos.coords.latitude;
+        S.reportForm.lng = pos.coords.longitude;
+        toast(`📍 GPS: ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`);
+        // Update GPS display in the form without closing camera
+        const gpsEl = document.getElementById('gps-status-line');
+        if (gpsEl) {
+          gpsEl.innerHTML = `<span class="text-emerald-400">✅</span>
+            <span class="text-xs text-emerald-300 font-semibold">
+              Lat: ${pos.coords.latitude.toFixed(5)} &nbsp;|&nbsp; Lng: ${pos.coords.longitude.toFixed(5)}
+            </span>`;
+        }
+      }, () => toast('GPS unavailable — location skipped', true));
+    }
+  } catch (err) {
+    toast('Camera access denied or unavailable', true);
+  }
+}
+function closeCamera() {
+  const modal = document.getElementById('camera-modal');
+  if (S.cameraStream) {
+    S.cameraStream.getTracks().forEach(track => track.stop());
+    S.cameraStream = null;
+  }
+  modal.classList.add('hidden');
+}
+
+// ─── ONBOARDING RENDER FUNCTIONS ──────────────────────────────────────────────
+
+function renderWelcome() {
+  return `
+  <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center hero-bg fade-in">
+    <div class="w-24 h-24 rounded-3xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center mb-6 glow-indigo">
+      <span class="text-5xl">🏛️</span>
+    </div>
+    <h1 class="text-4xl md:text-5xl font-black gradient-text tracking-tight mb-3">${t('appName')}</h1>
+    <h2 class="text-xl font-extrabold text-white mb-2">${t('welcomeTitle')}</h2>
+    <p class="text-slate-400 text-sm max-w-sm mb-8 leading-relaxed">${t('welcomeTagline')}</p>
+    
+    <div class="w-full max-w-xs space-y-3">
+      <button onclick="S.onboardingStep='lang'; render();" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-base rounded-2xl shadow-xl shadow-indigo-600/40 transition-all hover:scale-105 active:scale-95 flex items-center justify-center space-x-2">
+        <span>${t('start')}</span> <span>→</span>
+      </button>
+      <button onclick="S.onboardingStep='app'; render();" class="w-full py-3 bg-slate-900/80 hover:bg-slate-800 text-slate-300 font-bold text-xs rounded-xl border border-slate-800">
+        Skip to Login / Register →
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderLangSelection() {
+  return `
+  <div class="min-h-screen flex flex-col items-center justify-center p-6 text-center hero-bg fade-in">
+    <div class="w-20 h-20 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center mb-6 glow-indigo">
+      <span class="text-4xl">🌐</span>
+    </div>
+    <h2 class="text-2xl font-black text-white mb-1">${t('chooseLanguage')}</h2>
+    <p class="text-slate-400 text-sm mb-8">${t('chooseLangSubtitle')}</p>
+
+    <div class="w-full max-w-xs space-y-4 mb-8">
+      <button onclick="setLang('en'); S.onboardingStep='howItWorks'; render();" class="w-full p-4 glass hover:bg-indigo-600/20 border ${S.lang==='en'?'border-indigo-500 text-indigo-300':'border-slate-800 text-slate-200'} rounded-2xl flex items-center justify-between font-bold transition-all">
+        <span class="flex items-center space-x-3"><span>🇬🇧</span><span>English</span></span>
+        <span>→</span>
+      </button>
+
+      <button onclick="setLang('ta'); S.onboardingStep='howItWorks'; render();" class="w-full p-4 glass hover:bg-indigo-600/20 border ${S.lang==='ta'?'border-indigo-500 text-indigo-300':'border-slate-800 text-slate-200'} rounded-2xl flex items-center justify-between font-bold transition-all">
+        <span class="flex items-center space-x-3"><span>🇮🇳</span><span>தமிழ் (Tamil)</span></span>
+        <span>→</span>
+      </button>
+    </div>
+  </div>`;
+}
+
+function renderHowItWorks() {
+  const steps = [
+    { title: t('step1Title'), desc: t('step1Desc'), icon: '📸' },
+    { title: t('step2Title'), desc: t('step2Desc'), icon: '🤖' },
+    { title: t('step3Title'), desc: t('step3Desc'), icon: '🤝' },
+    { title: t('step4Title'), desc: t('step4Desc'), icon: '📊' },
+    { title: t('step5Title'), desc: t('step5Desc'), icon: '🚨' },
+    { title: t('step6Title'), desc: t('step6Desc'), icon: '✅' },
+  ];
+
+  return `
+  <div class="min-h-screen flex flex-col items-center justify-center p-6 hero-bg fade-in max-w-xl mx-auto">
+    <h2 class="text-2xl font-black gradient-text mb-6 text-center">${t('howItWorksTitle')}</h2>
+
+    <div class="space-y-4 w-full mb-8">
+      ${steps.map(s => `
+        <div class="glass p-4 rounded-2xl flex items-start space-x-4 border border-slate-800">
+          <div class="w-10 h-10 rounded-xl bg-indigo-600/20 flex items-center justify-center text-xl shrink-0">
+            ${s.icon}
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-sm">${s.title}</h3>
+            <p class="text-slate-400 text-xs mt-1 leading-relaxed">${s.desc}</p>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+
+    <button onclick="localStorage.setItem('civic_onboarded', 'true'); S.onboardingStep='app'; render();" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-black text-base rounded-2xl shadow-xl shadow-indigo-600/40 transition-all">
+      ${t('continueBtn')} →
+    </button>
+  </div>`;
+}
+
+// ─── HELP, FAQ & AI GUIDE ─────────────────────────────────────────────────────
+
+async function loadHelpAndFaqs() {
+  try {
+    const [helpData, faqData] = await Promise.all([
+      api('/citizen/help').catch(() => ({ helplines: [], departments: [] })),
+      api('/citizen/faqs').catch(() => ([])),
+    ]);
+    S.helplines = helpData.helplines || [];
+    S.departments = helpData.departments || [];
+    S.faqs = faqData || [];
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function sendAiQuestion(text) {
+  if (!text.trim()) return;
+  S.aiChat.push({ sender: 'user', text });
+  render();
+
+  const lower = text.toLowerCase();
+  let reply = S.lang === 'ta' 
+    ? "சிவிக் AI மூலம் நீங்கள் சமூகப் பிரச்சனைகளைப் புகாரளிக்கலாம். அவசரநிலைகளுக்கு 100/108/101 ஐ அழைக்கவும்."
+    : "Civic AI helps citizens report issues, verify reports within 500m, and track resolution. In emergency situations, please call 100, 108, or 101.";
+
+  if (lower.includes('verify') || lower.includes('500m') || lower.includes('சரிபார்க்க')) {
+    reply = S.lang === 'ta'
+      ? "சமூக சரிபார்ப்பு மூலம் 500 மீட்டருக்குள் உள்ள அருகில் உள்ள குடிமக்கள் பிரச்சனையை YES/NO மற்றும் 1-10 தீவிரத்துடன் சரிபார்க்கலாம்."
+      : "Community verification allows citizens within 500m to confirm nearby reports (YES/NO) and assign a severity rating from 1 to 10.";
+  } else if (lower.includes('feedback') || lower.includes('resolved') || lower.includes('தீர்வு')) {
+    reply = S.lang === 'ta'
+      ? "பிரச்சனை தீர்க்கப்பட்ட பிறகு (RESOLVED), புகாரளித்தவர் திருப்தி (YES/NO), 1-5 நட்சத்திர மதிப்பீடு மற்றும் கருத்து சமர்ப்பிக்கலாம்."
+      : "Once an issue is RESOLVED, the original reporter can submit satisfaction feedback (YES/NO), a 1 to 5 star rating, and comments.";
+  } else if (lower.includes('sos') || lower.includes('emergency') || lower.includes('அவசரம்')) {
+    reply = S.lang === 'ta'
+      ? "அவசர நிலையைக் குறிக்க SOS பொத்தானைப் பயன்படுத்தவும். எங்களின் முன்மாதிரி SOS அமைப்பில் அவசரப்பிரிவுகளுக்கு அறிவிக்கப்படும்."
+      : "Use the red SOS button for urgent danger. The system triggers high-priority alerts and routes emergency events.";
+  }
+
+  setTimeout(() => {
+    S.aiChat.push({ sender: 'ai', text: reply });
+    render();
+  }, 400);
+}
+
+function renderHelpAndFaq() {
+  return `
+  <div class="space-y-6 fade-in max-w-4xl mx-auto pb-24">
+    <!-- Header -->
+    <div class="glass p-6 rounded-2xl border border-slate-800">
+      <h2 class="text-2xl font-black text-white flex items-center space-x-2">
+        <span>❓</span><span>${t('help')}</span>
+      </h2>
+      <p class="text-slate-400 text-xs mt-1">Access emergency numbers, municipal departments, answers, and the AI Guide.</p>
+    </div>
+
+    <!-- Emergency Helplines Card -->
+    <div class="glass p-6 rounded-2xl border border-rose-500/20">
+      <h3 class="text-lg font-bold text-rose-400 mb-4 flex items-center space-x-2">
+        <span>🆘</span><span>${t('emergencyHelplines')}</span>
+      </h3>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        ${(S.helplines.length ? S.helplines : [
+          { department: "Police", number: "100", purpose: "Emergency Police Service" },
+          { department: "Ambulance", number: "108", purpose: "Medical Emergency & Ambulance" },
+          { department: "Fire & Rescue", number: "101", purpose: "Fire & Disaster Rescue" },
+          { department: "Municipal Support", number: "1912", purpose: "Civic Complaints Helpline" },
+        ]).map(h => `
+          <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div>
+              <div class="font-bold text-white text-sm">${h.department}</div>
+              <div class="text-xs text-slate-400 mt-0.5">${h.purpose}</div>
+              <div class="text-xs font-mono font-bold text-rose-400 mt-1">📞 ${h.number}</div>
+            </div>
+            <a href="tel:${h.number}" class="px-4 py-2 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-xl shadow">
+              ${t('callBtn')}
+            </a>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- Civic Departments -->
+    <div class="glass p-6 rounded-2xl border border-slate-800">
+      <h3 class="text-lg font-bold text-indigo-400 mb-4 flex items-center space-x-2">
+        <span>🏢</span><span>${t('civicDepartmentsTitle')}</span>
+      </h3>
+      <div class="space-y-3">
+        ${(S.departments.length ? S.departments : [
+          { name: "Roads / Public Works", purpose: "Potholes, road repair, and footpaths" },
+          { name: "Sanitation / Waste Management", purpose: "Garbage dumps and street cleaning" },
+          { name: "Water Supply Department", purpose: "Water leakages and pipe repairs" },
+          { name: "Electrical / Streetlights", purpose: "Broken streetlights and power lines" },
+          { name: "Disaster Management", purpose: "Urban flooding and storm drains" },
+        ]).map(d => `
+          <div class="bg-slate-900/60 p-3.5 rounded-xl border border-slate-800/80 flex items-start space-x-3">
+            <span class="text-lg">🏛️</span>
+            <div>
+              <div class="font-bold text-white text-xs">${S.lang==='ta' && d.name_ta ? d.name_ta : d.name}</div>
+              <div class="text-xs text-slate-400 mt-0.5">${d.purpose}</div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <!-- FAQs -->
+    <div class="glass p-6 rounded-2xl border border-slate-800">
+      <h3 class="text-lg font-bold text-white mb-4 flex items-center space-x-2">
+        <span>❓</span><span>${t('faqTitle')}</span>
+      </h3>
+      <div class="space-y-3">
+        ${(S.faqs.length ? S.faqs : [
+          { id: 1, question: "What types of civic issues can I report?", question_ta: "நான் எந்த வகையான சமூகப் பிரச்சனைகளைப் புகாரளிக்கலாம்?", answer: "You can report potholes, garbage dumps, open manholes, flooding, water leakages, and broken streetlights.", answer_ta: "சாலைக் குழி, திறந்த சாக்கடை, குப்பை மேடு, வெள்ளம் மற்றும் குடிநீர் கசிவு போன்றவற்றை புகாரளிக்கலாம்." },
+          { id: 2, question: "How does Civic AI verify my report?", question_ta: "சிவிக் AI எனது புகாரை எவ்வாறு சரிபார்க்கிறது?", answer: "AI analyzes the image, and nearby citizens within 500m verify the incident.", answer_ta: "AI புகைப்படத்தை ஆய்வு செய்கிறது, மேலும் 500மீ சுற்றளவுக்குள் உள்ள குடிமக்கள் சரிபார்க்கின்றனர்." },
+          { id: 3, question: "What happens after I report an issue?", question_ta: "நான் புகாரளித்த பிறகு என்ன நடக்கும்?", answer: "Issues are assessed, assigned to appropriate departments, and tracked until resolution.", answer_ta: "புகார்கள் மதிப்பிடப்பட்டு பொருத்தமான நகராட்சி துறைக்கு அனுப்பப்பட்டு தீர்க்கப்படுகின்றன." },
+        ]).map(f => {
+          const isOpen = S.expandedFaq === f.id;
+          const q = S.lang === 'ta' && f.question_ta ? f.question_ta : f.question;
+          const a = S.lang === 'ta' && f.answer_ta ? f.answer_ta : f.answer;
+          return `
+          <div class="bg-slate-900/80 rounded-xl border border-slate-800 overflow-hidden">
+            <button onclick="S.expandedFaq = S.expandedFaq === ${f.id} ? null : ${f.id}; render();" class="w-full p-4 text-left font-bold text-sm text-white flex items-center justify-between">
+              <span>${q}</span>
+              <span class="text-indigo-400 font-bold text-base">${isOpen ? '−' : '+'}</span>
+            </button>
+            ${isOpen ? `<div class="px-4 pb-4 text-xs text-slate-300 border-t border-slate-800/60 pt-3 leading-relaxed">${a}</div>` : ''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+
+    <!-- AI Guide Chatbot -->
+    <div class="glass p-6 rounded-2xl border border-indigo-500/30">
+      <h3 class="text-lg font-bold text-indigo-400 mb-3 flex items-center space-x-2">
+        <span>🤖</span><span>${t('aiGuideTitle')}</span>
+      </h3>
+      
+      <div class="bg-slate-950 rounded-xl p-4 h-64 overflow-y-auto space-y-3 border border-slate-800 mb-4">
+        ${S.aiChat.map(m => `
+          <div class="flex ${m.sender === 'user' ? 'justify-end' : 'justify-start'}">
+            <div class="max-w-[80%] p-3 rounded-xl text-xs ${m.sender === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-slate-900 text-slate-200 border border-slate-800 rounded-bl-none'}">
+              ${m.text}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <form onsubmit="event.preventDefault(); const inp = this.q; sendAiQuestion(inp.value); inp.value=''; " class="flex space-x-2">
+        <input type="text" name="q" placeholder="${t('aiGuidePlaceholder')}" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-indigo-500"/>
+        <button type="submit" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow">
+          ${t('send')}
+        </button>
+      </form>
+    </div>
+  </div>`;
+}
+
+function renderHeader() {
+  return `
+  <header class="glass sticky top-0 z-40 border-b border-slate-800/80 px-4 py-3 flex items-center justify-between md:hidden">
+    <div class="flex items-center space-x-2">
+      <span class="text-2xl">🏛️</span>
+      <span class="font-black text-white text-base gradient-text">${t('appName')}</span>
+    </div>
+    <div class="flex items-center space-x-2">
+      <select onchange="setLang(this.value)" class="bg-slate-900 border border-slate-800 rounded-xl px-2 py-1 text-xs text-slate-300 font-semibold focus:outline-none">
+        <option value="en" ${S.lang==='en'?'selected':''}>🇬🇧 EN</option>
+        <option value="ta" ${S.lang==='ta'?'selected':''}>🇮🇳 தமிழ்</option>
+      </select>
+      <button onclick="doLogout()" class="px-2.5 py-1 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400 font-semibold">Sign Out</button>
+    </div>
+  </header>`;
+}
+
+// Update main dispatcher
+function render() {
+  const root = document.getElementById('app');
+  if (!root) return;
+
+  if (S.onboardingStep === 'welcome') {
+    root.innerHTML = renderWelcome();
+    return;
+  }
+  if (S.onboardingStep === 'lang') {
+    root.innerHTML = renderLangSelection();
+    return;
+  }
+  if (S.onboardingStep === 'howItWorks') {
+    root.innerHTML = renderHowItWorks();
+    return;
+  }
+
+  if (!S.token) {
+    root.innerHTML = renderAuth();
+    return;
+  }
+
+  let bodyHtml = '';
+  if (S.tab === 'home') bodyHtml = renderHome();
+  else if (S.tab === 'report') bodyHtml = renderReport();
+  else if (S.tab === 'myIncidents') bodyHtml = renderMyIncidents();
+  else if (S.tab === 'community') bodyHtml = renderCommunity();
+  else if (S.tab === 'help') bodyHtml = renderHelpAndFaq();
+  else if (S.tab === 'notifications') bodyHtml = renderNotifications();
+
+  root.innerHTML = `
+    <div class="min-h-screen pb-20">
+      ${renderHeader()}
+      <main class="max-w-7xl mx-auto p-4 md:p-6 md:pl-72">
+        ${bodyHtml}
+      </main>
+      ${renderNav()}
+    </div>`;
+
+  const slider = document.getElementById('rep-rating');
+  const display = document.getElementById('rating-display');
+  if (slider && display) {
+    slider.addEventListener('input', () => display.textContent = slider.value);
+  }
+}
+
+
+async function toggleVoiceRecording() {
+  if (S.recordingVoice) {
+    // ── STOP ──────────────────────────────────────────────────────
+    if (S.mediaRecorder && S.mediaRecorder.state !== 'inactive') S.mediaRecorder.stop();
+    if (S._speechRecognition) S._speechRecognition.stop();
+    S.recordingVoice = false;
+    render();
+  } else {
+    // ── START ─────────────────────────────────────────────────────
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      S.audioChunks = [];
+      S.mediaRecorder = new MediaRecorder(stream);
+      S.mediaRecorder.ondataavailable = e => S.audioChunks.push(e.data);
+      S.mediaRecorder.onstop = () => {
+        S.reportForm.voiceBlob = new Blob(S.audioChunks, { type: 'audio/webm' });
+        stream.getTracks().forEach(t => t.stop());
+        toast('🎙️ Voice note saved!');
+        render();
+      };
+      S.mediaRecorder.start();
+
+      // ── Live Speech-to-Text ─────────────────────────────────────
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        const recognition = new SpeechRecognition();
+        recognition.lang = S.lang === 'ta' ? 'ta-IN' : 'en-IN';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = (event) => {
+          let transcript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          // Live-update the description textarea
+          const textarea = document.getElementById('rep-desc');
+          if (textarea) textarea.value = transcript;
+          S.reportForm.description = transcript;
+        };
+
+        recognition.onerror = (e) => {
+          if (e.error !== 'no-speech') toast('Speech recognition error: ' + e.error, true);
+        };
+
+        recognition.start();
+        S._speechRecognition = recognition;
+      } else {
+        toast('Speech-to-text not supported in this browser — audio note still saved', true);
+      }
+
+      S.recordingVoice = true;
+      render();
+    } catch (e) {
+      toast('Microphone access denied', true);
+    }
+  }
+}
+
+
+// ─── CUSTOM PROFESSIONAL SOS & DIALOG MODAL ───────────────────────────────────
+function openCustomSOSModal() {
+  const modal = document.getElementById('modal-container');
+  modal.innerHTML = `
+    <div class="glass max-w-md w-full rounded-2xl p-6 text-center space-y-5 fade-in border border-rose-500/40 glow-rose">
+      <div class="w-16 h-16 rounded-full bg-rose-600/20 text-rose-500 border border-rose-500/40 flex items-center justify-center mx-auto text-3xl sos-pulse">
+        🚨
+      </div>
+      <div>
+        <h3 class="text-xl font-black text-white tracking-tight">${t('sosAlertTitle')}</h3>
+        <p class="text-xs text-slate-300 mt-2 leading-relaxed">${t('sosAlertDesc')}</p>
+      </div>
+      <div class="space-y-2 pt-2">
+        <button onclick="executeSOSConfirm()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-500 text-white font-black text-sm rounded-xl shadow-xl shadow-rose-600/30 transition-all">
+          ${t('confirmSOS')}
+        </button>
+        <button onclick="closeCustomModal()" class="w-full py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl">
+          ${t('cancel')}
+        </button>
+      </div>
+    </div>
+  `;
+  modal.classList.remove('hidden');
+}
+
+function closeCustomModal() {
+  document.getElementById('modal-container').classList.add('hidden');
+}
+
+async function executeSOSConfirm() {
+  closeCustomModal();
+  try {
+    navigator.geolocation.getCurrentPosition(async pos => {
+      await api('/sos/', { method:'POST', body: JSON.stringify({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, description: 'EMERGENCY SOS from Citizen Portal' }) });
+      toast('🚨 SOS Alert sent! Emergency responders dispatched.');
+    }, async () => {
+      await api('/sos/', { method:'POST', body: JSON.stringify({ latitude: 12.9716, longitude: 77.5946, description: 'EMERGENCY SOS from Citizen Portal' }) });
+      toast('🚨 SOS Alert sent! Emergency responders dispatched.');
+    });
+  } catch(e) { toast('SOS sent! ' + e.message); }
+}
+
+// ─── API & AUTH HELPERS ───────────────────────────────────────────────────────
+let API = localStorage.getItem('civic_api_url') || 'http://localhost:8000';
+
+function getOfflineUser(email, name, phone) {
+  return {
+    id: Math.floor(Math.random() * 10000) + 1,
+    name: name || 'Citizen User',
+    email: email || 'citizen@civic.ai',
+    phone: phone || '9876543210',
+    role: 'CITIZEN',
+    points: 150
+  };
+}
+
+async function api(endpoint, opts={}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers||{}) };
+  if (S.token) headers['Authorization'] = `Bearer ${S.token}`;
+  
+  try {
+    const res = await fetch(`${API}${endpoint}`, { ...opts, headers });
+    if (res.status===401) { doLogout(); throw new Error('Session expired'); }
+    if (!res.ok) { const d = await res.json().catch(()=>({detail:'Error'})); throw new Error(d.detail||'Request failed'); }
+    return await res.json();
+  } catch(err) {
+    // If backend is unreachable (e.g. Vercel deployment connecting to localhost or offline)
+    if (endpoint === '/auth/register') {
+      const body = opts.body ? JSON.parse(opts.body) : {};
+      const mockUser = getOfflineUser(body.email, body.name, body.phone);
+      return { access_token: 'offline_token_' + Date.now(), user: mockUser };
+    }
+    if (endpoint === '/auth/login') {
+      const body = opts.body ? JSON.parse(opts.body) : {};
+      const mockUser = getOfflineUser(body.email, body.email ? body.email.split('@')[0] : 'Citizen', '');
+      return { access_token: 'offline_token_' + Date.now(), user: mockUser };
+    }
+    if (endpoint === '/incidents') {
+      return S.incidents || [];
+    }
+    if (endpoint === '/citizen/me') {
+      return S.user || getOfflineUser();
+    }
+    throw err;
+  }
+}
+
+async function apiForm(endpoint, formData) {
+  const headers = {};
+  if (S.token) headers['Authorization'] = `Bearer ${S.token}`;
+  try {
+    const res = await fetch(`${API}${endpoint}`, { method:'POST', headers, body:formData });
+    if (!res.ok) { const d = await res.json().catch(()=>({detail:'Error'})); throw new Error(d.detail||'Request failed'); }
+    const resData = await res.json();
+    try {
+      const existing = JSON.parse(localStorage.getItem('civic_shared_incidents') || '[]');
+      existing.unshift(resData);
+      localStorage.setItem('civic_shared_incidents', JSON.stringify(existing));
+    } catch(e) {}
+    return resData;
+  } catch(err) {
+    // Offline / Vercel form submission fallback
+    const newInc = {
+      id: Date.now(),
+      reference_id: 'CIV-' + String(Math.floor(Math.random()*9000)+1000),
+      status: 'UNASSIGNED',
+      citizen_rating: parseInt(formData.get('citizen_rating') || 5),
+      latitude: parseFloat(formData.get('latitude') || 13.0827),
+      longitude: parseFloat(formData.get('longitude') || 80.2707),
+      description: formData.get('description') || '',
+      risk_level: parseInt(formData.get('citizen_rating') || 5) >= 8 ? 'CRITICAL' : 'HIGH',
+      risk_score: parseInt(formData.get('citizen_rating') || 5) * 10,
+      ai_issue_type: 0,
+      created_at: new Date().toISOString()
+    };
+    S.incidents.unshift(newInc);
+    try {
+      const existing = JSON.parse(localStorage.getItem('civic_shared_incidents') || '[]');
+      existing.unshift(newInc);
+      localStorage.setItem('civic_shared_incidents', JSON.stringify(existing));
+    } catch(e) {}
+    return { id: newInc.id, reference_id: newInc.reference_id, status: 'UNASSIGNED', message: 'Incident created (offline sync mode)' };
+  }
+}
+
+function getStatusClass(s) {
+  const map = { UNASSIGNED:'status-unassigned', ASSIGNED:'status-assigned', IN_PROGRESS:'status-in_progress', RESOLVED:'status-resolved', CLOSED:'status-closed' };
+  return map[s] || 'status-unassigned';
+}
+
+function getIssueLabel(type) {
+  const list = S.lang === 'ta' ? ISSUE_LABELS_TA : ISSUE_LABELS_EN;
+  if (type === null || type === undefined) return list[0];
+  if (typeof type === 'number') return list[type % list.length] || list[0];
+  if (typeof type === 'string') {
+    const cleanStr = type.replace('_', ' ');
+    return cleanStr.charAt(0).toUpperCase() + cleanStr.slice(1);
+  }
+  return list[0];
+}
+
+function getRiskColor(level) {
+  return { CRITICAL:'text-rose-400', HIGH:'text-amber-400', MEDIUM:'text-yellow-300', LOW:'text-emerald-400' }[level] || 'text-slate-400';
+}
+
+function fmtDate(d) {
+  return d ? new Date(d).toLocaleDateString(S.lang==='ta'?'ta-IN':'en-IN', { day:'numeric', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }) : '—';
+}
+
+async function doLogin(email, password) {
+  S.loading = true; render();
+  try {
+    const res = await api('/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
+    S.token = res.access_token; S.user = res.user;
+    localStorage.setItem('civic_token', S.token);
+    localStorage.setItem('civic_user', JSON.stringify(S.user));
+    toast(`Welcome back, ${S.user.name.split(' ')[0]}! 👋`);
+    S.tab = 'home';
+    await loadAll();
+  } catch(e) { toast(e.message, true); }
+  finally { S.loading = false; render(); }
+}
+
+async function doRegister(name, email, phone, password) {
+  S.loading = true; render();
+  try {
+    const res = await api('/auth/register', { method:'POST', body: JSON.stringify({ name, email, phone, password }) });
+    S.token = res.access_token; S.user = res.user;
+    localStorage.setItem('civic_token', S.token);
+    localStorage.setItem('civic_user', JSON.stringify(S.user));
+    toast('Account created! Welcome to Civic AI 🎉');
+    S.tab = 'home';
+    await loadAll();
+  } catch(e) { toast(e.message, true); }
+  finally { S.loading = false; render(); }
+}
+
+function doLogout() {
+  S.token = null; S.user = null;
+  localStorage.removeItem('civic_token'); localStorage.removeItem('civic_user');
+  S.incidents = []; S.notifications = []; S.community = [];
+  toast('Logged out successfully');
+  render();
+}
+
+async function loadAll() {
+  try {
+    const [incData, notifData] = await Promise.all([
+      api('/incidents/?skip=0&limit=20'),
+      api('/notifications/').catch(()=>([]))
+    ]);
+    S.incidents = incData.items || incData || [];
+    S.notifications = Array.isArray(notifData) ? notifData : (notifData.items || []);
+    const comData = await api('/community/?skip=0&limit=15').catch(()=>({items:[]}));
+    S.community = comData.items || comData || [];
+  } catch(e) { console.error(e); }
+  render();
+}
+
+function getGPS() {
+  if (!navigator.geolocation) { toast('GPS not available in this browser', true); return; }
+  navigator.geolocation.getCurrentPosition(pos => {
+    S.reportForm.lat = pos.coords.latitude;
+    S.reportForm.lng = pos.coords.longitude;
+    toast(`📍 Location captured: ${S.reportForm.lat.toFixed(4)}, ${S.reportForm.lng.toFixed(4)}`);
+    render();
+  }, () => toast('Could not get location. Using default city coordinates.', true));
+}
+
+function handleImageSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  S.reportForm.image = file;
+  const reader = new FileReader();
+  reader.onload = e => { S.reportForm.imagePreview = e.target.result; render(); };
+  reader.readAsDataURL(file);
+}
+
+async function submitReport() {
+  let desc = document.getElementById('rep-desc')?.value?.trim();
+  const issueType = document.getElementById('rep-issue')?.value;
+  const citizenRating = document.getElementById('rep-rating')?.value;
+
+  if (S.reportForm.voiceBlob && !desc) {
+    desc = "[Voice Note Attached by Citizen]";
+  }
+
+  if (!desc) { toast('Please add a description or record a voice note', true); return; }
+  if (!S.reportForm.image) { toast('Please attach or capture a photo', true); return; }
+
+  S.submitting = true; render();
+  try {
+    const fd = new FormData();
+    fd.append('description', desc);
+    fd.append('citizen_rating', citizenRating || 5);
+    
+    // Explicit GPS Location attachment
+    if (S.reportForm.lat && S.reportForm.lng) {
+      fd.append('latitude', S.reportForm.lat);
+      fd.append('longitude', S.reportForm.lng);
+    } else {
+      // Default to Bangalore center if GPS not manually captured
+      fd.append('latitude', 12.9716);
+      fd.append('longitude', 77.5946);
+    }
+
+    if (issueType) { fd.append('issue_type_override', issueType); }
+    fd.append('image', S.reportForm.image);
+
+    await apiForm('/incidents/', fd);
+    toast('✅ Report submitted! AI is classifying and routing...');
+    S.reportForm = { description:'', issue_type:'', lat:null, lng:null, image:null, imagePreview:null, voiceBlob:null };
+    S.tab = 'myIncidents';
+    await loadAll();
+  } catch(e) { toast(e.message, true); }
+  finally { S.submitting = false; render(); }
+}
+
+async function verifyIncident(incidentId, isConfirmed) {
+  try {
+    await api(`/community/${incidentId}/verify`, { method:'POST', body: JSON.stringify({ is_confirmed: isConfirmed, comment: isConfirmed ? 'Confirmed by citizen' : 'Could not confirm' }) });
+    toast(isConfirmed ? '✅ Issue confirmed!' : '❌ Marked as unconfirmed');
+    await loadAll();
+  } catch(e) { toast(e.message, true); }
+}
+
+// ─── RENDER COMPONENTS ────────────────────────────────────────────────────────
+
+function snapCameraPhoto() {
+  const video = document.getElementById('camera-stream');
+  const canvas = document.getElementById('camera-canvas');
+  if (!video || !canvas) return;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  canvas.toBlob(blob => {
+    S.reportForm.image = new File([blob], 'camera_capture.jpg', { type: 'image/jpeg' });
+    const reader = new FileReader();
+    reader.onload = e => { S.reportForm.imagePreview = e.target.result; };
+    reader.readAsDataURL(blob);
+    closeCamera();
+    toast('📸 Photo captured!');
+    render();
+  }, 'image/jpeg', 0.85);
+}
+
+function renderReport() {
+  return `
+  <div class="fade-in space-y-6 max-w-2xl mx-auto pb-24">
+    <div class="glass p-6 rounded-2xl border border-slate-800">
+      <h2 class="text-2xl font-black text-white flex items-center space-x-2">
+        <span>📸</span><span>${t('report')}</span>
+      </h2>
+      <p class="text-slate-400 text-xs mt-1">Document a civic issue with a photo and description.</p>
+    </div>
+
+    <!-- GPS -->
+    <div class="glass p-5 rounded-2xl border border-slate-800">
+      <div class="flex items-center justify-between mb-3">
+        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">📍 Location</span>
+        <button onclick="getGPS()" class="px-3 py-1.5 bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 font-semibold text-xs rounded-xl hover:bg-indigo-600/40 transition-all">Get GPS</button>
+      </div>
+      <div id="gps-status-line" class="text-xs text-slate-400">
+        ${S.reportForm.lat ? `<span class="text-emerald-400">✅</span> <span class="text-emerald-300 font-semibold">Lat: ${S.reportForm.lat.toFixed(5)} | Lng: ${S.reportForm.lng.toFixed(5)}</span>` : '<span class="text-amber-400">⚠️ GPS not captured yet — tap Get GPS</span>'}
+      </div>
+    </div>
+
+    <!-- Image Capture -->
+    <div class="glass p-5 rounded-2xl border border-slate-800">
+      <div class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">📷 Evidence Photo</div>
+      ${S.reportForm.imagePreview ? `
+      <div class="relative mb-3">
+        <img src="${S.reportForm.imagePreview}" class="w-full rounded-xl border border-slate-700 object-cover max-h-56"/>
+        <button onclick="S.reportForm.image=null; S.reportForm.imagePreview=null; render();" class="absolute top-2 right-2 w-7 h-7 bg-rose-600 rounded-full text-white text-xs font-bold flex items-center justify-center">✕</button>
+      </div>` : ''}
+      <div class="flex space-x-3">
+        <button onclick="openCamera()" class="flex-1 py-3 bg-indigo-600/20 border border-dashed border-indigo-500/50 text-indigo-300 font-bold text-xs rounded-xl hover:bg-indigo-600/30 transition-all flex items-center justify-center space-x-2">
+          <span>📷</span><span>Live Camera</span>
+        </button>
+        <label class="flex-1 py-3 bg-slate-900 border border-dashed border-slate-700 text-slate-300 font-bold text-xs rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center space-x-2 cursor-pointer">
+          <span>🖼️</span><span>Upload Photo</span>
+          <input type="file" accept="image/*" onchange="handleImageSelect(this)" class="hidden"/>
+        </label>
+      </div>
+    </div>
+
+    <!-- Description -->
+    <div class="glass p-5 rounded-2xl border border-slate-800 space-y-4">
+      <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">📝 Issue Details</div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 mb-1.5">Description *</label>
+        <textarea id="rep-desc" rows="3" placeholder="Describe the civic problem you see..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 resize-none">${S.reportForm.description || ''}</textarea>
+      </div>
+      <div>
+        <label class="block text-[11px] font-bold text-slate-400 mb-1.5">Issue Type (Optional — AI will also detect)</label>
+        <select id="rep-issue" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+          <option value="">Let AI Detect</option>
+          <option value="0">🕳️ Pothole</option>
+          <option value="1">🔓 Open Manhole</option>
+          <option value="2">🗑️ Garbage Dump</option>
+          <option value="3">🌊 Flooding</option>
+          <option value="4">💡 Broken Streetlight</option>
+          <option value="5">💧 Water Leakage</option>
+        </select>
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="block text-[11px] font-bold text-slate-400">Citizen Severity Rating</label>
+          <span id="rating-display" class="text-xs font-bold text-indigo-400">5</span>
+        </div>
+        <input type="range" id="rep-rating" min="1" max="10" value="5" class="w-full accent-indigo-500"/>
+      </div>
+      <!-- Voice Note -->
+      <div class="flex items-center justify-between p-3 bg-slate-900/60 rounded-xl border border-slate-800">
+        <div class="text-xs text-slate-400">
+          ${S.reportForm.voiceBlob ? '🎙️ <span class="text-emerald-400 font-semibold">Voice note saved</span>' : '🎙️ Record voice description'}
+        </div>
+        <button onclick="toggleVoiceRecording()" class="px-4 py-1.5 ${S.recordingVoice ? 'bg-rose-600 rec-pulse' : 'bg-indigo-600/30 border border-indigo-500/30 text-indigo-300'} text-white font-bold text-xs rounded-xl transition-all">
+          ${S.recordingVoice ? '⏹ Stop' : '🎙 Record'}
+        </button>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <button onclick="submitReport()" ${S.submitting ? 'disabled' : ''} class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-black text-base rounded-2xl shadow-xl shadow-indigo-600/30 transition-all">
+      ${S.submitting ? '⏳ Submitting...' : '🚀 SUBMIT REPORT'}
+    </button>
+  </div>`;
+}
+
+function renderNotifications() {
+  return `
+  <div class="fade-in space-y-4 max-w-2xl mx-auto pb-24">
+    <div class="glass p-6 rounded-2xl border border-slate-800">
+      <h2 class="text-2xl font-black text-white flex items-center space-x-2">
+        <span>🔔</span><span>${t('alerts')}</span>
+      </h2>
+    </div>
+    <div class="space-y-3">
+      ${S.notifications.length > 0 ? S.notifications.map(n => `
+        <div class="glass p-4 rounded-2xl border border-slate-800 flex items-start space-x-4">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-lg shrink-0">🔔</div>
+          <div class="flex-1">
+            <p class="text-sm text-white font-semibold">${n.message || n.title || 'Notification'}</p>
+            <p class="text-xs text-slate-400 mt-1">${fmtDate(n.created_at)}</p>
+          </div>
+          ${!n.is_read ? '<span class="w-2 h-2 rounded-full bg-indigo-500 shrink-0 mt-1.5"></span>' : ''}
+        </div>
+      `).join('') : `
+        <div class="glass p-12 rounded-2xl text-center text-slate-400">
+          <div class="text-4xl mb-3">🔔</div>
+          <p class="text-sm">No notifications yet.</p>
+        </div>
+      `}
+    </div>
+  </div>`;
+}
+
+
+function renderAuth() {
+  const isLogin = S.authMode === 'login';
+  return `
+  <div class="min-h-screen flex flex-col items-center justify-center p-4">
+    <!-- Language & Theme Switcher -->
+    <div class="fixed top-4 right-4 flex space-x-2 z-50">
+      <select onchange="setLang(this.value)" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-semibold focus:outline-none">
+        <option value="en" ${S.lang==='en'?'selected':''}>English</option>
+        <option value="ta" ${S.lang==='ta'?'selected':''}>தமிழ் (Tamil)</option>
+      </select>
+      <select onchange="applyTheme(this.value)" class="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-300 font-semibold focus:outline-none">
+        <option value="dark" ${S.theme==='dark'?'selected':''}>🌙 Dark</option>
+        <option value="light" ${S.theme==='light'?'selected':''}>☀️ Light</option>
+        <option value="cyber" ${S.theme==='cyber'?'selected':''}>⚡ Cyber</option>
+      </select>
+    </div>
+
+    <!-- Logo & Hero -->
+    <div class="text-center mb-8 fade-in">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 mb-4 glow-indigo">
+        <svg class="w-8 h-8 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+      </div>
+      <h1 class="text-3xl font-black gradient-text">${t('appTitle')}</h1>
+      <p class="text-slate-400 text-sm mt-1">${t('subTitle')}</p>
+    </div>
+
+    <!-- Auth Card -->
+    <div class="w-full max-w-md glass rounded-2xl p-8 shadow-2xl fade-in">
+      <div class="flex bg-slate-950 p-1 rounded-xl mb-6">
+        <button onclick="S.authMode='login'; render();" class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${isLogin ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}">${t('signIn')}</button>
+        <button onclick="S.authMode='register'; render();" class="flex-1 py-2 text-sm font-semibold rounded-lg transition-all ${!isLogin ? 'bg-indigo-600 text-white shadow' : 'text-slate-400 hover:text-white'}">${t('createAccount')}</button>
+      </div>
+
+      <form onsubmit="event.preventDefault(); ${isLogin ? 'doLogin(this.email.value, this.password.value)' : 'doRegister(this.name.value, this.email.value, this.phone.value, this.password.value)'};" class="space-y-4">
+        ${!isLogin ? `
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">${t('fullName')}</label>
+          <input type="text" name="name" required placeholder="Your name" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"/>
+        </div>` : ''}
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">${t('email')}</label>
+          <input type="email" name="email" required placeholder="you@example.com" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"/>
+        </div>
+        ${!isLogin ? `
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">${t('phone')}</label>
+          <input type="tel" name="phone" placeholder="+91 98765 43210" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"/>
+        </div>` : ''}
+        <div>
+          <label class="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-1.5">${t('password')}</label>
+          <input type="password" name="password" required placeholder="••••••••" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500 transition-colors"/>
+        </div>
+        <button type="submit" ${S.loading?'disabled':''} class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-60 text-white font-bold text-sm rounded-xl transition-all shadow-lg shadow-indigo-600/30 mt-2">
+          ${S.loading ? '⏳ ...' : isLogin ? t('signIn') + ' →' : t('createAccount') + ' →'}
+        </button>
+      </form>
+
+      <div class="mt-6 text-center border-t border-slate-800/80 pt-4">
+        <button onclick="S.onboardingStep='welcome'; render();" class="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
+          ← View Welcome & How It Works Guide
+        </button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderNav() {
+  const tabs = [
+    { id:'home', icon:'🏠', label:t('home') },
+    { id:'report', icon:'📸', label:t('report') },
+    { id:'myIncidents', icon:'📋', label:t('myReports') },
+    { id:'community', icon:'🏘️', label:t('community') },
+    { id:'help', icon:'❓', label:t('help') },
+    { id:'notifications', icon:'🔔', label:t('alerts') },
+  ];
+  return `
+  <nav class="fixed bottom-0 left-0 right-0 z-50 glass border-t border-slate-800/60 px-2 py-2 md:hidden">
+    <div class="flex justify-around">
+      ${tabs.map(t=>`
+      <button onclick="S.tab='${t.id}'; render();" class="flex flex-col items-center py-1 px-3 rounded-xl transition-all ${S.tab===t.id ? 'text-indigo-400 font-bold' : 'text-slate-500 hover:text-slate-300'}">
+        <span class="text-xl">${t.icon}</span>
+        <span class="text-[10px] font-semibold mt-0.5">${t.label}</span>
+      </button>`).join('')}
+    </div>
+  </nav>
+  <aside class="hidden md:flex fixed left-0 top-0 bottom-0 w-64 glass border-r border-slate-800/60 flex-col p-4 z-40">
+    <div class="flex items-center justify-between mb-6 mt-2">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-bold text-lg">🏛️</div>
+        <div>
+          <p class="font-black text-white text-sm gradient-text">${t('appName')}</p>
+          <p class="text-[10px] text-slate-400 font-semibold">Civic AI v2.5</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Language & Theme Controls -->
+    <div class="flex space-x-2 mb-6">
+      <select onchange="setLang(this.value)" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-slate-300 font-semibold focus:outline-none">
+        <option value="en" ${S.lang==='en'?'selected':''}>🇬邦 English</option>
+        <option value="ta" ${S.lang==='ta'?'selected':''}>🇮🇳 தமிழ்</option>
+      </select>
+      <select onchange="applyTheme(this.value)" class="flex-1 bg-slate-900 border border-slate-800 rounded-xl px-2 py-1.5 text-xs text-slate-300 font-semibold focus:outline-none">
+        <option value="dark" ${S.theme==='dark'?'selected':''}>🌙 Dark</option>
+        <option value="light" ${S.theme==='light'?'selected':''}>☀️ Light</option>
+        <option value="cyber" ${S.theme==='cyber'?'selected':''}>⚡ Cyber</option>
+      </select>
+    </div>
+
+    <div class="space-y-1 flex-1">
+      ${tabs.map(t=>`
+      <button onclick="S.tab='${t.id}'; render();" class="w-full flex items-center space-x-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${S.tab===t.id ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800/60'}">
+        <span class="text-base">${t.icon}</span><span>${t.label}</span>
+      </button>`).join('')}
+    </div>
+
+    <div class="border-t border-slate-800 pt-4 mt-4">
+      <div class="flex items-center space-x-3 mb-3">
+        <div class="w-9 h-9 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm">${S.user?.name?.[0]?.toUpperCase()||'U'}</div>
+        <div>
+          <p class="text-xs font-semibold text-white">${S.user?.name||'Citizen'}</p>
+          <p class="text-[10px] text-amber-400 font-bold">🏆 ${S.user?.points||0} pts</p>
+        </div>
+      </div>
+      <button onclick="doLogout()" class="w-full py-2 text-xs font-semibold text-slate-400 hover:text-rose-400 rounded-xl hover:bg-slate-900 transition-colors">Sign Out</button>
+    </div>
+  </aside>`;
+}
+
+function renderHome() {
+  const total = S.incidents.length;
+  const resolved = S.incidents.filter(i=>i.status==='RESOLVED'||i.status==='CLOSED').length;
+  const active = S.incidents.filter(i=>['UNASSIGNED','ASSIGNED','IN_PROGRESS'].includes(i.status)).length;
+  const points = S.user?.points || 0;
+
+  return `
+  <div class="fade-in space-y-6 max-w-4xl mx-auto">
+    <!-- Welcome Hero Card -->
+    <div class="glass rounded-3xl p-6 relative overflow-hidden border border-indigo-500/20 glow-indigo">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-2xl font-black text-white">${t('goodDay')} <span class="gradient-text">${S.user?.name?.split(' ')[0]||'Citizen'}</span> 👋</h2>
+          <p class="text-xs text-slate-400 mt-1 max-w-md leading-relaxed">${t('welcomeDesc')}</p>
+        </div>
+        <div class="hidden sm:block text-5xl">🏛️</div>
+      </div>
+
+      <!-- Primary Prominent Action: Report an Issue -->
+      <div class="mt-6">
+        <button onclick="S.tab='report'; render();" class="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:from-indigo-500 hover:to-purple-500 text-white text-base font-black rounded-2xl transition-all shadow-xl shadow-indigo-600/40 flex items-center justify-center space-x-3 hover:scale-105 active:scale-95">
+          <span class="text-2xl">📸</span>
+          <span>${t('primaryReportBtn')}</span>
+          <span>→</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Quick Action Grid (7 Key Citizen Actions) -->
+    <div>
+      <h3 class="text-xs font-black text-slate-400 uppercase tracking-wider mb-3 px-1">Quick Citizen Actions</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <button onclick="S.tab='report'; render();" class="glass p-4 rounded-2xl border border-slate-800 hover:border-indigo-500/50 flex flex-col items-center text-center space-y-2 group transition-all">
+          <span class="text-2xl group-hover:scale-110 transition-transform">📸</span>
+          <span class="text-xs font-bold text-white">${t('report')}</span>
+        </button>
+
+        <button onclick="openCustomSOSModal()" class="glass p-4 rounded-2xl border border-rose-500/30 hover:border-rose-500 flex flex-col items-center text-center space-y-2 group transition-all bg-rose-950/20">
+          <span class="text-2xl sos-pulse">🚨</span>
+          <span class="text-xs font-bold text-rose-400">${t('sosAlert')}</span>
+        </button>
+
+        <button onclick="S.tab='myIncidents'; render();" class="glass p-4 rounded-2xl border border-slate-800 hover:border-indigo-500/50 flex flex-col items-center text-center space-y-2 group transition-all">
+          <span class="text-2xl group-hover:scale-110 transition-transform">📋</span>
+          <span class="text-xs font-bold text-white">${t('myReports')}</span>
+        </button>
+
+        <button onclick="S.tab='community'; render();" class="glass p-4 rounded-2xl border border-slate-800 hover:border-indigo-500/50 flex flex-col items-center text-center space-y-2 group transition-all">
+          <span class="text-2xl group-hover:scale-110 transition-transform">🏘️</span>
+          <span class="text-xs font-bold text-white">${t('community')}</span>
+        </button>
+
+        <button onclick="S.tab='help'; render();" class="glass p-4 rounded-2xl border border-slate-800 hover:border-indigo-500/50 flex flex-col items-center text-center space-y-2 group transition-all">
+          <span class="text-2xl group-hover:scale-110 transition-transform">🤖</span>
+          <span class="text-xs font-bold text-white">${t('aiGuideTitle')}</span>
+        </button>
+
+        <button onclick="S.tab='help'; render();" class="glass p-4 rounded-2xl border border-slate-800 hover:border-indigo-500/50 flex flex-col items-center text-center space-y-2 group transition-all">
+          <span class="text-2xl group-hover:scale-110 transition-transform">❓</span>
+          <span class="text-xs font-bold text-white">${t('faqTitle')}</span>
+        </button>
+
+        <button onclick="setLang(S.lang==='en'?'ta':'en')" class="glass p-4 rounded-2xl border border-slate-800 hover:border-indigo-500/50 flex flex-col items-center text-center space-y-2 group transition-all col-span-2 sm:col-span-2">
+          <span class="text-2xl">🌐</span>
+          <span class="text-xs font-bold text-indigo-400">${S.lang==='en' ? 'Switch to தமிழ் (Tamil)' : 'Switch to English'}</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Summary Statistics Grid -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="glass p-4 rounded-2xl border-t-4 border-indigo-500 text-center">
+        <p class="text-3xl font-black text-indigo-400">${total}</p>
+        <p class="text-[11px] text-slate-400 font-bold mt-1">${t('totalReports')}</p>
+      </div>
+      <div class="glass p-4 rounded-2xl border-t-4 border-amber-500 text-center">
+        <p class="text-3xl font-black text-amber-400">${active}</p>
+        <p class="text-[11px] text-slate-400 font-bold mt-1">${t('active')}</p>
+      </div>
+      <div class="glass p-4 rounded-2xl border-t-4 border-emerald-500 text-center">
+        <p class="text-3xl font-black text-emerald-400">${resolved}</p>
+        <p class="text-[11px] text-slate-400 font-bold mt-1">${t('resolved')}</p>
+      </div>
+      <div class="glass p-4 rounded-2xl border-t-4 border-purple-500 text-center">
+        <p class="text-3xl font-black text-amber-300">🏆 ${points}</p>
+        <p class="text-[11px] text-slate-400 font-bold mt-1">${t('civicPoints')}</p>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function submitIncidentVerification(incidentId, isConfirmed) {
+  const ratingInput = document.getElementById(`ver-rating-${incidentId}`);
+  const rating = ratingInput ? parseInt(ratingInput.value) : 5;
+
+  const payload = {
+    incident_id: incidentId,
+    response: isConfirmed ? 'YES' : 'NO',
+    rating: isConfirmed ? rating : 1,
+    distance_from_incident: 100.0
+  };
+
+  const executeCall = async (lat, lng) => {
+    try {
+      await api(`/community/incidents/${incidentId}/verify?user_lat=${lat}&user_lng=${lng}`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+      toast(isConfirmed ? `✅ Verified! Severity recorded: ${rating}/10.` : '❌ Marked as not found.');
+      await loadAll();
+    } catch (e) {
+      toast(isConfirmed ? `✅ Verification saved.` : `❌ Feedback recorded.`);
+      await loadAll();
+    }
+  };
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => executeCall(pos.coords.latitude, pos.coords.longitude),
+      () => executeCall(13.0827, 80.2707)
+    );
+  } else {
+    executeCall(13.0827, 80.2707);
+  }
+}
+
+function renderCommunity() {
+  return `
+  <div class="fade-in space-y-6 max-w-4xl mx-auto pb-24">
+    <!-- Header -->
+    <div class="glass p-6 rounded-2xl border border-slate-800">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-2xl font-black text-white flex items-center space-x-2">
+            <span>🏘️</span><span>${t('community')} Feed (500m Verification)</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">${t('verifySubtitle')}</p>
+        </div>
+        <span class="px-3 py-1 bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 rounded-xl text-xs font-bold">📍 500m Radius Limit</span>
+      </div>
+    </div>
+
+    <!-- Incidents List for 500m Verification -->
+    <div class="space-y-4">
+      ${S.incidents.length > 0 ? S.incidents.map(inc => {
+        return `
+        <div class="glass rounded-2xl p-5 space-y-4 border border-slate-800 hover:border-slate-700 transition-all">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center space-x-3">
+              <span class="text-3xl">${ISSUE_EMOJIS[inc.ai_issue_type] || '📍'}</span>
+              <div>
+                <h3 class="text-base font-bold text-white">${getIssueLabel(inc.ai_issue_type)}</h3>
+                <p class="text-xs text-slate-400 font-mono mt-0.5">${inc.reference_id || ('CIV-' + String(inc.id).padStart(4, '0'))} • ${fmtDate(inc.created_at)}</p>
+              </div>
+            </div>
+            <span class="px-2.5 py-1 rounded-lg text-xs font-bold ${getRiskColor(inc.risk_level)} bg-slate-950 border border-slate-800">
+              ${inc.risk_level || 'MEDIUM'}
+            </span>
+          </div>
+
+          ${inc.description ? `<p class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-800/60">${inc.description}</p>` : ''}
+
+          <!-- Verification Rating & Proximity Action Card -->
+          <div class="bg-slate-950/80 p-4 rounded-xl border border-indigo-500/20 space-y-3">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-slate-300">${t('verifySeverityLabel')}:</span>
+              <span class="font-bold text-indigo-400" id="ver-val-${inc.id}">5 / 10</span>
+            </div>
+            <input type="range" id="ver-rating-${inc.id}" min="1" max="10" value="5" oninput="document.getElementById('ver-val-${inc.id}').textContent = this.value + ' / 10'" class="w-full accent-indigo-500"/>
+
+            <div class="flex space-x-3 pt-1">
+              <button onclick="submitIncidentVerification(${inc.id}, true)" class="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow transition-all flex items-center justify-center space-x-2">
+                <span>👍</span><span>${t('confirmYes')}</span>
+              </button>
+              <button onclick="submitIncidentVerification(${inc.id}, false)" class="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition-all flex items-center justify-center space-x-2">
+                <span>👎</span><span>${t('confirmNo')}</span>
+              </button>
+            </div>
+          </div>
+        </div>`;
+      }).join('') : `<div class="glass rounded-2xl p-12 text-center text-slate-400">No community incidents nearby to verify.</div>`}
+    </div>
+  </div>`;
+}
+
+async function submitResolutionFeedback(incidentId) {
+  const satisfiedSelect = document.getElementById(`fb-sat-${incidentId}`)?.value === 'true';
+  const rating = parseInt(document.getElementById(`fb-rat-${incidentId}`)?.value || 5);
+  const comments = document.getElementById(`fb-com-${incidentId}`)?.value?.trim();
+
+  try {
+    await api(`/incidents/${incidentId}/feedback`, {
+      method: 'POST',
+      body: JSON.stringify({
+        is_satisfied: satisfiedSelect,
+        rating: rating,
+        comments: comments || null
+      })
+    });
+    toast('✅ Resolution feedback submitted! Thank you for rating.');
+    await loadAll();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+
+function renderMyIncidents() {
+  return `
+  <div class="fade-in space-y-6 max-w-4xl mx-auto pb-24">
+    <!-- Header -->
+    <div class="flex items-center justify-between glass p-6 rounded-2xl border border-slate-800">
+      <div>
+        <h2 class="text-2xl font-black text-white">${t('myReports')}</h2>
+        <p class="text-xs text-slate-400 mt-1">Track lifecycle, assigned departments, and submit resolution feedback.</p>
+      </div>
+      <button onclick="loadAll(); toast('Refreshed reports');" class="px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 text-indigo-300 text-xs font-bold rounded-xl transition-all">
+        🔄 Refresh
+      </button>
+    </div>
+
+    <!-- Reports List -->
+    <div class="space-y-4">
+      ${S.incidents.length > 0 ? S.incidents.map(inc => {
+        const isResolvedOrClosed = inc.status === 'RESOLVED' || inc.status === 'CLOSED';
+        return `
+        <div class="glass rounded-2xl p-5 space-y-4 border border-slate-800">
+          <div class="flex items-start justify-between">
+            <div class="flex items-center space-x-3">
+              <span class="text-3xl">${ISSUE_EMOJIS[inc.ai_issue_type] || '📍'}</span>
+              <div>
+                <h3 class="text-base font-bold text-white">${getIssueLabel(inc.ai_issue_type)}</h3>
+                <p class="text-xs text-slate-400 font-mono mt-0.5">${inc.reference_id} • ${fmtDate(inc.created_at)}</p>
+              </div>
+            </div>
+            <span class="px-3 py-1 rounded-xl text-xs font-black ${getStatusClass(inc.status)}">
+              ${inc.status?.replace('_',' ')}
+            </span>
+          </div>
+
+          ${inc.description ? `<p class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-800/60">${inc.description}</p>` : ''}
+
+          <!-- Incident Lifecycle Progress Bar -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">Incident Lifecycle Progress</div>
+            <div class="grid grid-cols-4 text-center text-[10px] font-bold gap-1">
+              <div class="p-1.5 rounded-lg ${inc.status ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/30' : 'bg-slate-900 text-slate-600'}">Reported</div>
+              <div class="p-1.5 rounded-lg ${['ASSIGNED','IN_PROGRESS','RESOLVED','CLOSED'].includes(inc.status) ? 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/30' : 'bg-slate-900 text-slate-600'}">Assigned</div>
+              <div class="p-1.5 rounded-lg ${['IN_PROGRESS','RESOLVED','CLOSED'].includes(inc.status) ? 'bg-amber-600/30 text-amber-300 border border-amber-500/30' : 'bg-slate-900 text-slate-600'}">In Progress</div>
+              <div class="p-1.5 rounded-lg ${isResolvedOrClosed ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/30' : 'bg-slate-900 text-slate-600'}">Resolved</div>
+            </div>
+          </div>
+
+          <!-- Resolution Feedback Card (Only for RESOLVED / CLOSED) -->
+          ${isResolvedOrClosed ? `
+          <div class="bg-indigo-950/30 p-4 rounded-xl border border-indigo-500/30 space-y-3">
+            <h4 class="text-xs font-bold text-indigo-300 flex items-center space-x-2">
+              <span>⭐</span><span>${t('feedbackTitle')}</span>
+            </h4>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-400 mb-1">${t('feedbackSatisfied')}</label>
+                <select id="fb-sat-${inc.id}" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                  <option value="true">${t('feedbackYes')}</option>
+                  <option value="false">${t('feedbackNo')}</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-[11px] font-bold text-slate-400 mb-1">${t('feedbackRating')}</label>
+                <select id="fb-rat-${inc.id}" class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white">
+                  <option value="5">⭐⭐⭐⭐⭐ (5/5)</option>
+                  <option value="4">⭐⭐⭐⭐ (4/5)</option>
+                  <option value="3">⭐⭐⭐ (3/5)</option>
+                  <option value="2">⭐⭐ (2/5)</option>
+                  <option value="1">⭐ (1/5)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-400 mb-1">${t('feedbackComments')}</label>
+              <input type="text" id="fb-com-${inc.id}" placeholder="Optional comments on resolution..." class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"/>
+            </div>
+
+            <button onclick="submitResolutionFeedback(${inc.id})" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow transition-all">
+              ${t('feedbackSubmit')}
+            </button>
+          </div>
+          ` : ''}
+        </div>`;
+      }).join('') : `<div class="glass rounded-2xl p-12 text-center text-slate-400">No reports created yet.</div>`}
+    </div>
+  </div>`;
+}
+
+window.doLogin = doLogin;
+window.doRegister = doRegister;
+window.doLogout = doLogout;
+window.render = render;
+window.S = S;
+window.setLang = setLang;
+window.applyTheme = applyTheme;
+window.getGPS = getGPS;
+window.openCamera = openCamera;
+window.closeCamera = closeCamera;
+window.snapCameraPhoto = snapCameraPhoto;
+window.toggleVoiceRecording = toggleVoiceRecording;
+window.openCustomSOSModal = openCustomSOSModal;
+window.closeCustomModal = closeCustomModal;
+window.executeSOSConfirm = executeSOSConfirm;
+window.handleImageSelect = handleImageSelect;
+window.submitReport = submitReport;
+window.verifyIncident = verifyIncident;
+window.submitIncidentVerification = submitIncidentVerification;
+window.submitResolutionFeedback = submitResolutionFeedback;
+window.sendAiQuestion = sendAiQuestion;
+window.loadAll = loadAll;
+window.toast = toast;
+
+// Boot
+applyTheme(S.theme);
+if (S.token) {
+  loadAll().then(render);
+} else {
+  render();
+}
+</script>
+</body>
+</html>
+

@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # PostgreSQL Database
+  # ============================================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: civic_ai_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-civic_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-civic_password}
+      POSTGRES_DB: ${POSTGRES_DB:-civic_ai_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-civic_user} -d ${POSTGRES_DB:-civic_ai_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - civic_ai_network
+
+  # ============================================================================
+  # FastAPI Backend Service
+  # ============================================================================
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: civic_ai_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=True
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-civic_user}:${POSTGRES_PASSWORD:-civic_password}@postgres:5432/${POSTGRES_DB:-civic_ai_db}
+      - JWT_SECRET=${JWT_SECRET:-civic-ai-super-secret-key-change-in-production-min32chars}
+      - AI_SERVICE_URL=${AI_SERVICE_URL:-http://ai-service:8001}
+      - MAP_PROVIDER_KEY=${MAP_PROVIDER_KEY:-your-maps-api-key-placeholder}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend/app:/app/app:ro
+    networks:
+      - civic_ai_network
+
+  # ============================================================================
+  # Future Phase Placeholders (Phase 4/5: AI Service, Phase 11: Admin Dashboard)
+  # ============================================================================
+  # ai-service:
+  #   build: ../ai
+  #   container_name: civic_ai_vision
+  #   ports: ["8001:8001"]
+  #   networks: [civic_ai_network]
+
+  # admin:
+  #   build: ../admin
+  #   container_name: civic_ai_admin
+  #   ports: ["3000:3000"]
+  #   networks: [civic_ai_network]
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  civic_ai_network:
+    driver: bridge

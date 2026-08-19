@@ -1,0 +1,7 @@
+{
+  "dataset_name": "dataset_2_open_manhole_source",
+  "source": "Urban Safety Manhole Open Data",
+  "license": "MIT",
+  "target_class": "open_manhole",
+  "intended_count": 75
+}

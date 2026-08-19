@@ -1,0 +1,7 @@
+{
+  "dataset_name": "dataset_3_garbage_source",
+  "source": "Waste Identification Public Benchmark",
+  "license": "CC0 Public Domain",
+  "target_class": "garbage",
+  "intended_count": 85
+}

@@ -1,0 +1,7 @@
+{
+  "dataset_name": "dataset_5_broken_streetlight_source",
+  "source": "City Infrastructure Lighting Audit",
+  "license": "OBL-1.0",
+  "target_class": "broken_streetlight",
+  "intended_count": 72
+}

@@ -1,0 +1,7 @@
+{
+  "dataset_name": "dataset_6_water_leakage_source",
+  "source": "Municipal Water Utility Leakage Log",
+  "license": "Apache-2.0",
+  "target_class": "water_leakage",
+  "intended_count": 76
+}

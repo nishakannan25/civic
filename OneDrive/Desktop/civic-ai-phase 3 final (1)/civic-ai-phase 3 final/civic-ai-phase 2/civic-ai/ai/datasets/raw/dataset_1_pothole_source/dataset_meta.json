@@ -1,0 +1,7 @@
+{
+  "dataset_name": "dataset_1_pothole_source",
+  "source": "Roboflow Civic-Issues Dataset (Pothole subset)",
+  "license": "CC-BY-4.0",
+  "target_class": "pothole",
+  "intended_count": 80
+}
