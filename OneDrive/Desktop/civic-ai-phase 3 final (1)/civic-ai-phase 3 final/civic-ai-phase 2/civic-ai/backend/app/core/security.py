@@ -65,3 +65,37 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         raise UnauthorizedException("User not found or inactive.")
     
     return user
+
+from fastapi.security import OAuth2PasswordBearer
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login", auto_error=False)
+
+def get_current_user_optional(token: Optional[str] = Depends(oauth2_scheme_optional), db: Session = Depends(get_db)):
+    """Retrieve user if valid token supplied, otherwise retrieve/create default guest citizen user."""
+    from ..models.user import User
+    if token:
+        user_id = decode_access_token(token)
+        if user_id:
+            try:
+                user = db.query(User).filter(User.id == int(user_id)).first()
+                if user:
+                    return user
+            except Exception:
+                pass
+    
+    # Fallback to guest citizen user
+    guest = db.query(User).filter(User.email == "citizen@civic.ai").first()
+    if not guest:
+        from .security import get_password_hash
+        guest = User(
+            name="Citizen User",
+            email="citizen@civic.ai",
+            phone="9876543210",
+            password_hash=get_password_hash("citizen123"),
+            role="citizen",
+            points=100,
+            reputation_score=5.0,
+        )
+        db.add(guest)
+        db.commit()
+        db.refresh(guest)
+    return guest

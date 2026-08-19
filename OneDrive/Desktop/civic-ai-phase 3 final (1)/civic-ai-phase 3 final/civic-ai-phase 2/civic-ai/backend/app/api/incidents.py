@@ -28,7 +28,7 @@ from ..services.incident_service import IncidentService
 from ..services.storage_service import StorageService
 from ..services.risk_service import RiskEngineService
 from ..services.notification_service import NotificationService
-from ..core.security import get_current_user
+from ..core.security import get_current_user, get_current_user_optional
 from ..core.config import settings
 from ..core.constants import LocationStatus
 from ..core.exceptions import EntityNotFoundException
@@ -71,7 +71,7 @@ async def create_incident(
     client_incident_id: Optional[str] = Form(None, max_length=64, description="Client unique incident identifier"),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key", description="HTTP header for idempotency"),
     # Dependencies
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_optional),
     db: Session = Depends(get_db),
     storage: StorageService = Depends(_get_storage_service),
 ):
