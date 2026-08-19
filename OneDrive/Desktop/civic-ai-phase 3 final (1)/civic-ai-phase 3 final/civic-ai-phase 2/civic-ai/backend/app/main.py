@@ -34,6 +34,22 @@ async def lifespan(app: FastAPI):
     if db:
         try:
             CivicRoutingService.seed_default_departments(db)
+            # Seed default admin user if not existing
+            from .models.user import User
+            from .core.security import get_password_hash
+            admin_user = db.query(User).filter(User.email == "admin@civic.ai").first()
+            if not admin_user:
+                admin_user = User(
+                    name="System Administrator",
+                    email="admin@civic.ai",
+                    phone="9999999999",
+                    password_hash=get_password_hash("admin123"),
+                    role="admin",
+                    points=1000,
+                    reputation_score=5.0,
+                )
+                db.add(admin_user)
+                db.commit()
         finally:
             db.close()
 
