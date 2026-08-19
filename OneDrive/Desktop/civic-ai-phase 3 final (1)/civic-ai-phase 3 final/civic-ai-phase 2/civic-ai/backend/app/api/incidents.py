@@ -52,6 +52,12 @@ def _get_storage_service() -> StorageService:
     status_code=status.HTTP_201_CREATED,
     summary="Create a new civic incident report with image upload and idempotency",
 )
+@router.post(
+    "/",
+    response_model=IncidentCreateResponse,
+    status_code=status.HTTP_201_CREATED,
+    include_in_schema=False,
+)
 async def create_incident(
     # Image file — required for Phase 2 & 3
     image: UploadFile = File(..., description="Incident photo (JPEG or PNG, max 10 MB)"),
