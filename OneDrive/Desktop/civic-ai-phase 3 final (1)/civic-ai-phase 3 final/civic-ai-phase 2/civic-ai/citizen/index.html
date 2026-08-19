@@ -974,12 +974,20 @@ function doLogout() {
 async function loadAll() {
   try {
     const [incData, notifData] = await Promise.all([
-      api('/incidents/?skip=0&limit=20'),
-      api('/notifications/').catch(()=>([]))
+      api('/incidents/?skip=0&limit=20').catch(() => []),
+      api('/notifications/').catch(() => [])
     ]);
-    S.incidents = incData.items || incData || [];
+    const remoteIncidents = Array.isArray(incData) ? incData : (incData.items || []);
+    const sharedIncidents = JSON.parse(localStorage.getItem('civic_shared_incidents') || '[]');
+    const combined = [...sharedIncidents];
+    for (const inc of remoteIncidents) {
+      if (!combined.some(c => c.id === inc.id || (c.reference_id && c.reference_id === inc.reference_id))) {
+        combined.push(inc);
+      }
+    }
+    S.incidents = combined;
     S.notifications = Array.isArray(notifData) ? notifData : (notifData.items || []);
-    const comData = await api('/community/?skip=0&limit=15').catch(()=>({items:[]}));
+    const comData = await api('/community/?skip=0&limit=15').catch(() => ({items:[]}));
     S.community = comData.items || comData || [];
   } catch(e) { console.error(e); }
   render();
