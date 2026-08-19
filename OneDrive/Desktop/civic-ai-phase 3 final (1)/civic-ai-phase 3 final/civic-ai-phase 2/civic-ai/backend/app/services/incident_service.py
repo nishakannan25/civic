@@ -63,6 +63,7 @@ class IncidentService:
         citizen_rating: int,
         location_status: str,
         image_url: Optional[str] = None,
+        description: Optional[str] = None,
         latitude: Optional[float] = None,
         longitude: Optional[float] = None,
         gps_accuracy: Optional[float] = None,
@@ -106,6 +107,7 @@ class IncidentService:
         now = datetime.now(timezone.utc)
         incident = Incident(
             user_id=user_id,
+            description=description,
             image_url=image_url,
             latitude=latitude,
             longitude=longitude,

@@ -63,6 +63,7 @@ async def create_incident(
     image: UploadFile = File(..., description="Incident photo (JPEG or PNG, max 10 MB)"),
     # Citizen perceived severity: 0 (minor) to 10 (critical)
     citizen_rating: int = Form(..., ge=0, le=10, description="Citizen severity rating 0–10"),
+    description: Optional[str] = Form(None, description="Citizen incident description"),
     # GPS fields — optional, may be null when GPS is unavailable
     latitude: Optional[float] = Form(None, ge=-90.0, le=90.0),
     longitude: Optional[float] = Form(None, ge=-180.0, le=180.0),
@@ -138,7 +139,7 @@ async def create_incident(
         )
 
     # Parse device timestamp
-    incident_timestamp: Optional[datetime] = None,
+    incident_timestamp: Optional[datetime] = None
     if timestamp:
         try:
             incident_timestamp = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
@@ -168,6 +169,7 @@ async def create_incident(
         citizen_rating=citizen_rating,
         location_status=loc_status.value,
         image_url=image_url,
+        description=description,
         latitude=latitude,
         longitude=longitude,
         gps_accuracy=gps_accuracy,

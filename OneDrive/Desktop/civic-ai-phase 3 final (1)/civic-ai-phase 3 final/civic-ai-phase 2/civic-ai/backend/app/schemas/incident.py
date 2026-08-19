@@ -57,6 +57,7 @@ class IncidentResponse(BaseModel):
 
     id: int
     user_id: int
+    description: Optional[str] = None
     image_url: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None

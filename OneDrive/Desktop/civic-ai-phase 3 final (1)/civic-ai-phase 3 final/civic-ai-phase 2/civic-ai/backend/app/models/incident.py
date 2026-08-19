@@ -11,6 +11,7 @@ class Incident(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    description = Column(Text, nullable=True)
     image_url = Column(String(512), nullable=True)
     # Phase 2: latitude/longitude are nullable when GPS is unavailable
     latitude = Column(Float, nullable=True, index=True)
