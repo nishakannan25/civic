@@ -186,11 +186,12 @@ if os.path.exists(_admin_dir):
     app.mount("/admin-static", StaticFiles(directory=_admin_dir), name="admin_static")
 
 # ==============================================================================
-# Citizen Portal — Web SPA
+# Citizen Portal — Web SPA & PWA
 # ==============================================================================
 
 _citizen_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "citizen"))
 
+@app.get("/", include_in_schema=False)
 @app.get("/citizen-portal", include_in_schema=False)
 @app.get("/citizen", include_in_schema=False)
 def serve_citizen_portal():
@@ -201,3 +202,5 @@ def serve_citizen_portal():
 
 if os.path.exists(_citizen_dir):
     app.mount("/citizen-static", StaticFiles(directory=_citizen_dir), name="citizen_static")
+    app.mount("/", StaticFiles(directory=_citizen_dir, html=True), name="citizen_root")
+
