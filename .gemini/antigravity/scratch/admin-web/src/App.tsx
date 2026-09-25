@@ -5,6 +5,7 @@ import { AdminLayout } from './layouts/AdminLayout';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { useAuthStore } from './stores/useAuthStore';
 import { LoginPage } from './pages/LoginPage';
+import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ScholarshipsPage } from './pages/ScholarshipsPage';
 import { ScholarshipFormPage } from './pages/ScholarshipFormPage';
@@ -33,6 +34,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       
       {/* Protected Admin Routes */}
       <Route element={<ProtectedRoute />}>

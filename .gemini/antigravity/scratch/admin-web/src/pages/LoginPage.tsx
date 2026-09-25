@@ -147,6 +147,18 @@ export const LoginPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Register Link */}
+        <div className="pt-3 border-t border-slate-800 text-center text-xs text-slate-400">
+          New Administrator?{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/register')}
+            className="text-blue-400 hover:underline font-bold"
+          >
+            Create Admin Account
+          </button>
+        </div>
+
         <div className="text-center text-[11px] text-slate-500">
           ScholarPath Admin Web • Application Number Authentication
         </div>
