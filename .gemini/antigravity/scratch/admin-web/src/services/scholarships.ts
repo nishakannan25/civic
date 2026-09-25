@@ -145,10 +145,29 @@ export const scholarshipsService = {
 
   async update(id: string, data: Partial<ScholarshipItem>): Promise<ScholarshipItem> {
     try {
-      return await authFetch<ScholarshipItem>(`/api/scholarships/${id}`, {
+      const updated = await authFetch<ScholarshipItem>(`/api/scholarships/${id}`, {
         method: 'PUT',
         body: JSON.stringify(data),
       });
+
+      // Broadcast live WebSocket event to all active Applicant clients
+      try {
+        const backendHost = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        await fetch(`${backendHost}/api/admin/scholarships/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scholarshipId: id,
+            title: data.title || 'Updated Scholarship Program',
+            newAmount: data.amount ? `₹${data.amount.toLocaleString('en-IN')}` : 'Updated Amount',
+            targetUrl: `/scholarships/${id}`,
+          }),
+        });
+      } catch (wsErr) {
+        console.warn('WebSocket broadcast error:', wsErr);
+      }
+
+      return updated;
     } catch {
       const idx = mockScholarships.findIndex((s) => s.id === id);
       if (idx === -1) throw new Error('Scholarship not found');
@@ -157,6 +176,22 @@ export const scholarshipsService = {
         ...data,
         updatedAt: new Date().toISOString(),
       };
+
+      // Broadcast live WebSocket notification even in mock mode
+      try {
+        const backendHost = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+        fetch(`${backendHost}/api/admin/scholarships/update`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            scholarshipId: id,
+            title: mockScholarships[idx].title,
+            newAmount: `₹${mockScholarships[idx].amount.toLocaleString('en-IN')}`,
+            targetUrl: `/scholarships/${id}`,
+          }),
+        }).catch(() => {});
+      } catch {}
+
       return mockScholarships[idx];
     }
   },
