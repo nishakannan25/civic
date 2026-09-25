@@ -21,6 +21,33 @@ export const DashboardPage: React.FC = () => {
             Real-time scholarship management, VeriFlow rule engine metrics, and active policy states
           </p>
         </div>
+
+        {/* Live Broadcast Trigger to Applicant Web */}
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const backendHost = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+              await fetch(`${backendHost}/api/admin/scholarships/update`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  scholarshipId: 'SCH-TN-2026',
+                  title: 'National Merit STEM Fellowship 2026',
+                  oldAmount: '₹1,50,000',
+                  newAmount: '₹2,00,000',
+                  targetUrl: '/scholarships',
+                }),
+              });
+              alert('📢 Real-time update broadcasted! Check the Applicant Portal tab for the live pop-up toast!');
+            } catch (err) {
+              alert('Broadcast failed: Check backend connection.');
+            }
+          }}
+          className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-md transition-all flex items-center space-x-2 shrink-0 animate-pulse"
+        >
+          <span>📢 Broadcast Real-Time Update to Applicants</span>
+        </button>
       </div>
 
       {/* API Error Alert */}
